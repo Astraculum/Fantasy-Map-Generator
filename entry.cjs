@@ -4,25 +4,67 @@ const path = require('path');
 const http = require('http');
 const fs = require('fs');
 
-// Map generation options
+// Map generation options with defaults
 const mapOptions = {
-	seed: "AgentMatrix2025",             // Custom seed
-	heightmap: "highIsland",            // Heightmap template
-	mapSize: 65,                         // Map size percentage
-	culturesSet: "european",             // Culture set
-	points: 12000,                       // Number of points/cells
-	temperatureEquator: 30,              // Custom temperature at equator
-	latitudeValue: 45,                   // Latitude
-	longitudeValue: 50,                   // Longitude
+	seed: "AgentMatrix2025",       // Custom seed
+	heightmap: "highIsland",       // Heightmap template
+	mapSize: 65,                   // Map size percentage
+	culturesSet: "european",       // Culture set
+	points: 12000,                 // Number of points/cells
+	temperatureEquator: 27,        // Custom temperature at equator
+	temperatureNorthPole: -30,     // Temperature at north pole
+	temperatureSouthPole: -15,     // Temperature at south pole
+	latitudeValue: 45,             // Latitude
+	longitudeValue: 50,            // Longitude
 	pinNotes: false,
 	winds: [225, 45, 225, 315, 135, 315],
-	temperatureEquator: 27,
-	temperatureNorthPole: -30,
-	temperatureSouthPole: -15,
 	stateLabelsMode: "auto",
 	showBurgPreview: true,
 	villageMaxPopulation: 2000
 };
+
+// Parse command line arguments
+function parseCommandLineArgs() {
+	const args = process.argv.slice(2);
+
+	if (args.includes('--help') || args.includes('-h')) {
+		console.log('Usage: node entry.cjs [options]');
+		console.log('Options:');
+		console.log('  --seed=VALUE             Set map seed');
+		console.log('  --heightmap=VALUE        Set heightmap template (volcano, highIsland, lowIsland, etc.)');
+		console.log('  --mapSize=VALUE          Set map size percentage (1-100)');
+		console.log('  --culturesSet=VALUE      Set culture set (european, oriental, african, etc.)');
+		console.log('  --points=VALUE           Set number of points/cells');
+		console.log('  --temperatureEquator=VALUE Set temperature at equator');
+		console.log('  --latitudeValue=VALUE    Set latitude (0-90)');
+		console.log('  --longitudeValue=VALUE   Set longitude (0-100)');
+		process.exit(0);
+	}
+
+	for (const arg of args) {
+		if (arg.startsWith('--')) {
+			const [param, value] = arg.slice(2).split('=');
+			if (param in mapOptions) {
+				// Convert to appropriate type
+				if (!isNaN(value) && value !== '') {
+					if (Array.isArray(mapOptions[param])) {
+						mapOptions[param] = value.split(',').map(Number);
+					} else {
+						mapOptions[param] = Number(value);
+					}
+				} else if (value === 'true' || value === 'false') {
+					mapOptions[param] = value === 'true';
+				} else {
+					mapOptions[param] = value;
+				}
+				console.log(`Setting ${param} to ${mapOptions[param]}`);
+			}
+		}
+	}
+}
+
+// Apply command line arguments
+parseCommandLineArgs();
 // volcano: {id: 0, name: "Volcano", template: volcano, probability: 3},
 // highIsland: {id: 1, name: "High Island", template: highIsland, probability: 19},
 // lowIsland: {id: 2, name: "Low Island", template: lowIsland, probability: 9},
