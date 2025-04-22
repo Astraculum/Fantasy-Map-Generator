@@ -4,3 +4,5 @@
 /dist
 /coverage
 /downloads
+__*
+!__init__.py
