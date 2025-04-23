@@ -158,7 +158,10 @@ class FMGMapGenerator:
                         stats[key] = float(value)
                     else:
                         stats[key] = value
-
+        # remove `.crdownload` from downloaded file name
+        if "file_name" in download_info:
+            download_info["file_name"] = download_info["file_name"].replace(
+                ".crdownload", "")
         # Add download information to statistics
         if download_info:
             stats.update(download_info)
