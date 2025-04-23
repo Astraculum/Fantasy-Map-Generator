@@ -109,7 +109,9 @@ class FMGMapGenerator:
         # Find map file from stats
         map_file = None
         if "file_path" in stats:
-            map_file = Path(stats["file_path"])
+            # Remove .crdownload if present
+            file_path_str = stats["file_path"].replace(".crdownload", "")
+            map_file = Path(file_path_str)
             if not map_file.exists():
                 raise FileNotFoundError(f"Map file does not exist: {map_file}")
 
@@ -161,6 +163,10 @@ class FMGMapGenerator:
         # remove `.crdownload` from downloaded file name
         if "file_name" in download_info:
             download_info["file_name"] = download_info["file_name"].replace(
+                ".crdownload", "")
+
+        if "file_path" in download_info:
+            download_info["file_path"] = download_info["file_path"].replace(
                 ".crdownload", "")
         # Add download information to statistics
         if download_info:
