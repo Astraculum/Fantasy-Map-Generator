@@ -2,6 +2,7 @@
 # filepath: /home/maxwell/AgentMatrix/FMG/fmg_python_bridge.py
 import subprocess
 import json
+import uuid
 import os
 import time
 import sys
@@ -168,6 +169,16 @@ class FMGMapGenerator:
         if "file_path" in download_info:
             download_info["file_path"] = download_info["file_path"].replace(
                 ".crdownload", "")
+        # If a file was downloaded, rename it with a UUID
+        if "file_path" in download_info and download_info["file_path"]:
+            original_path = Path(download_info["file_path"])
+            if original_path.exists():
+                new_uuid = uuid.uuid4().hex
+                new_name = f"{new_uuid}{original_path.suffix}"
+                new_path = original_path.parent / new_name
+                original_path.rename(new_path)
+                download_info["file_name"] = new_name
+                download_info["file_path"] = str(new_path)
         # Add download information to statistics
         if download_info:
             stats.update(download_info)
