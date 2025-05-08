@@ -90,7 +90,7 @@ parseCommandLineArgs();
 	const app = express();
 	app.use(express.static(path.join(__dirname)));
 	const server = http.createServer(app);
-	const PORT = 3000;
+	const PORT = 53214;
 	await new Promise((resolve, reject) => {
 		server.listen(PORT, (err) => {
 			if (err) reject(err);
@@ -102,7 +102,10 @@ parseCommandLineArgs();
 	});
 
 	// Launch Puppeteer
-	const browser = await puppeteer.launch({ headless: true });
+	const browser = await puppeteer.launch({ 
+		headless: true,
+		args: ['--no-sandbox']
+	});
 	const page = await browser.newPage();
 
 	// Get CDP session and set download directory
@@ -264,5 +267,4 @@ const waitForDownload = (timeout = 30000) => {
 		checkDownload();
 	});
 };
-
 
