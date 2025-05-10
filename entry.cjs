@@ -1,59 +1,64 @@
-const express = require('express');
-const puppeteer = require('puppeteer');
-const path = require('path');
-const http = require('http');
-const fs = require('fs');
+const express = require("express");
+const puppeteer = require("puppeteer");
+const path = require("path");
+const http = require("http");
+const fs = require("fs");
 
 // Map generation options with defaults
 const mapOptions = {
-	seed: "AgentMatrix2025",       // Custom seed
-	heightmap: "volcano",       // Heightmap template
-	mapSize: 65,                   // Map size percentage
-	culturesSet: "european",       // Culture set
-	points: 12000,                 // Number of points/cells
-	temperatureEquator: 27,        // Custom temperature at equator
-	temperatureNorthPole: -30,     // Temperature at north pole
-	temperatureSouthPole: -15,     // Temperature at south pole
-	latitudeValue: 45,             // Latitude
-	longitudeValue: 50,            // Longitude
+	seed: "13123", // Custom seed
+	heightmap: "volcano", // Heightmap template
+	mapSize: 100, // Map size percentage
+	culturesSet: "european", // Culture set
+	points: 9000, // Number of points/cells
+	temperatureEquator: 27, // Custom temperature at equator
+	temperatureNorthPole: -30, // Temperature at north pole
+	temperatureSouthPole: -15, // Temperature at south pole
+	latitudeValue: 45, // Latitude
+	statesNumber: 10, // Number of states
+	longitudeValue: 50, // Longitude
 	pinNotes: false,
 	winds: [225, 45, 225, 315, 135, 315],
 	stateLabelsMode: "auto",
 	showBurgPreview: true,
-	villageMaxPopulation: 2000
+	villageMaxPopulation: 2000,
 };
 
 // Parse command line arguments
 function parseCommandLineArgs() {
 	const args = process.argv.slice(2);
 
-	if (args.includes('--help') || args.includes('-h')) {
-		console.log('Usage: node entry.cjs [options]');
-		console.log('Options:');
-		console.log('  --seed=VALUE             Set map seed');
-		console.log('  --heightmap=VALUE        Set heightmap template (volcano, highIsland, lowIsland, etc.)');
-		console.log('  --mapSize=VALUE          Set map size percentage (1-100)');
-		console.log('  --culturesSet=VALUE      Set culture set (european, oriental, african, etc.)');
-		console.log('  --points=VALUE           Set number of points/cells');
-		console.log('  --temperatureEquator=VALUE Set temperature at equator');
-		console.log('  --latitudeValue=VALUE    Set latitude (0-90)');
-		console.log('  --longitudeValue=VALUE   Set longitude (0-100)');
+	if (args.includes("--help") || args.includes("-h")) {
+		console.log("Usage: node entry.cjs [options]");
+		console.log("Options:");
+		console.log("  --seed=VALUE             Set map seed");
+		console.log(
+			"  --heightmap=VALUE        Set heightmap template (volcano, highIsland, lowIsland, etc.)"
+		);
+		console.log("  --mapSize=VALUE          Set map size percentage (1-100)");
+		console.log(
+			"  --culturesSet=VALUE      Set culture set (european, oriental, african, etc.)"
+		);
+		console.log("  --points=VALUE           Set number of points/cells");
+		console.log("  --temperatureEquator=VALUE Set temperature at equator");
+		console.log("  --latitudeValue=VALUE    Set latitude (0-90)");
+		console.log("  --longitudeValue=VALUE   Set longitude (0-100)");
 		process.exit(0);
 	}
 
 	for (const arg of args) {
-		if (arg.startsWith('--')) {
-			const [param, value] = arg.slice(2).split('=');
+		if (arg.startsWith("--")) {
+			const [param, value] = arg.slice(2).split("=");
 			if (param in mapOptions) {
 				// Convert to appropriate type
-				if (!isNaN(value) && value !== '') {
+				if (!isNaN(value) && value !== "") {
 					if (Array.isArray(mapOptions[param])) {
-						mapOptions[param] = value.split(',').map(Number);
+						mapOptions[param] = value.split(",").map(Number);
 					} else {
 						mapOptions[param] = Number(value);
 					}
-				} else if (value === 'true' || value === 'false') {
-					mapOptions[param] = value === 'true';
+				} else if (value === "true" || value === "false") {
+					mapOptions[param] = value === "true";
 				} else {
 					mapOptions[param] = value;
 				}
@@ -81,7 +86,7 @@ parseCommandLineArgs();
 // fractious: {id: 13, name: "Fractious", template: fractious, probability: 3}
 (async () => {
 	// Create download directory (if it doesn't exist)
-	const downloadPath = path.resolve(__dirname, 'downloads');
+	const downloadPath = path.resolve(__dirname, "downloads");
 	if (!fs.existsSync(downloadPath)) {
 		fs.mkdirSync(downloadPath);
 	}
@@ -103,82 +108,180 @@ parseCommandLineArgs();
 
 	// Launch Puppeteer
 	const browser = await puppeteer.launch({
-		headless: true,
-		args: ['--no-sandbox'],
-		devtools: true  // This will open DevTools
+		// headless: true,
+		// args: ['--no-sandbox'],
+		devtools: true, // This will open DevTools
 	});
 	const page = await browser.newPage();
 
 	// Get CDP session and set download directory
 	const client = await page.createCDPSession();
-	await client.send('Page.setDownloadBehavior', {
-		behavior: 'allow',
-		downloadPath: downloadPath
+	await client.send("Page.setDownloadBehavior", {
+		behavior: "allow",
+		downloadPath: downloadPath,
 	});
 
 	// Load page
 	const url = `http://localhost:${PORT}/index.html`;
-	await page.goto(url, { waitUntil: 'networkidle0' });
+	await page.goto(url, { waitUntil: "networkidle0" });
 
 	// Set form values and inject options before map generation
-	await page.evaluate((mapOptions) => {
-		showOptions();
+	await page.evaluate(async (mapOptions) => {
+		// Wait for elements to be fully loaded
+		const waitForElement = (selector) => {
+			return (
+				document.querySelector(selector) !== null ||
+				new Promise((resolve) => {
+					const observer = new MutationObserver(() => {
+						if (document.querySelector(selector)) {
+							observer.disconnect();
+							resolve();
+						}
+					});
+					observer.observe(document.body, { childList: true, subtree: true });
+					// Timeout after 5 seconds
+					setTimeout(() => {
+						observer.disconnect();
+						resolve();
+					}, 5000);
+				})
+			);
+		};
+
+		// Make sure all necessary elements are loaded
+		await waitForElement("#optionsTab");
+		await waitForElement("#optionsSeed");
+		await waitForElement("#statesNumber");
+		await waitForElement("#mapSizeInput");
+
+		// Navigate to options tab
+		if (typeof showOptions === "function") {
+			showOptions();
+		}
+		document.getElementById("optionsTab").click();
+
 		// Set seed
 		document.getElementById("optionsSeed").value = mapOptions.seed;
+		document.getElementById("optionsSeed").dispatchEvent(new Event("input", { bubbles: true }));
+		document.getElementById("optionsSeed").dispatchEvent(new Event("change", { bubbles: true }));
 
-		// Set heightmap template
-		// Get the slider-input element  
-		const statesNumberInput = document.getElementById("statesNumber");
+		// Set states number
+		const input = document.getElementById("statesNumber");
+		input.value = mapOptions.statesNumber;
+		// Dispatch both input and change if needed
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		input.dispatchEvent(new Event("change", { bubbles: true }));
 
-		// Set its value  
-		statesNumberInput.value = 20;
-
-		// Make sure to trigger any necessary events  
-		statesNumberInput.dispatchEvent(new Event('change'));
-		regenerateMap("heightmap change");				
-		// Log the value of templateInput
-		// console.log('templateInput.value after set:', document.getElementById("templateInput").value);
 
 		// Set map size
 		document.getElementById("mapSizeInput").value = mapOptions.mapSize;
 		document.getElementById("mapSizeOutput").value = mapOptions.mapSize;
+		document.getElementById("mapSizeInput").dispatchEvent(new Event("input", { bubbles: true }));
+		document.getElementById("mapSizeInput").dispatchEvent(new Event("change", { bubbles: true }));
 
 		// Set cultures set
 		document.getElementById("culturesSet").value = mapOptions.culturesSet;
+		document.getElementById("culturesSet").dispatchEvent(new Event("input", { bubbles: true }));
+		document.getElementById("culturesSet").dispatchEvent(new Event("change", { bubbles: true }));
 
 		// Set points/cells
 		document.getElementById("pointsInput").value = mapOptions.points;
 		document.getElementById("pointsInput").dataset.cells = mapOptions.points;
+		document.getElementById("pointsInput").dispatchEvent(new Event("input", { bubbles: true }));
+		document.getElementById("pointsInput").dispatchEvent(new Event("change", { bubbles: true }));
 
 		// Set temperature at equator
-		document.getElementById("temperatureEquatorOutput").value = mapOptions.temperatureEquator;
-		document.getElementById("temperatureEquatorInput").value = mapOptions.temperatureEquator;
+		document.getElementById("temperatureEquatorOutput").value =
+			mapOptions.temperatureEquator;
+		document.getElementById("temperatureEquatorInput").value =
+			mapOptions.temperatureEquator;
+		document.getElementById("temperatureEquatorInput").dispatchEvent(new Event("input", { bubbles: true }));
+		document.getElementById("temperatureEquatorInput").dispatchEvent(new Event("change", { bubbles: true }));
 
 		// Set latitude and longitude
 		document.getElementById("latitudeInput").value = mapOptions.latitudeValue;
 		document.getElementById("latitudeOutput").value = mapOptions.latitudeValue;
+		document.getElementById("latitudeInput").dispatchEvent(new Event("input", { bubbles: true }));
+		document.getElementById("latitudeInput").dispatchEvent(new Event("change", { bubbles: true }));
+
 		document.getElementById("longitudeInput").value = mapOptions.longitudeValue;
-		document.getElementById("longitudeOutput").value = mapOptions.longitudeValue;
+		document.getElementById("longitudeOutput").value =
+			mapOptions.longitudeValue;
+		document.getElementById("longitudeInput").dispatchEvent(new Event("input", { bubbles: true }));
+		document.getElementById("longitudeInput").dispatchEvent(new Event("change", { bubbles: true }));
 
-		// Lock options to prevent randomization
-		// if (window.lockOption) {
-		// 	window.lockOption("template");
-		// 	window.lockOption("mapSize");
-		// 	window.lockOption("latitude");
-		// 	window.lockOption("longitude");
+		// Lock options to prevent randomization if the function exists
+		if (typeof lockOption === "function") {
+			lockOption("template");
+			lockOption("mapSize");
+			lockOption("latitude");
+			lockOption("longitude");
+		}
+
+		// document.getElementById('templateInput').value = 'Volcano';
+		// document.getElementById('templateInput').dispatchEvent(new Event('input', { bubbles: true }));
+
+		// If there's a custom handler in the parent container, try triggering that too
+		// const container = document.getElementById("templateInputContainer");
+		// if (container) container.click();
+		// // Select the right template in the heightmap selection container
+		// const heightmapContainer = document.querySelector('.heightmap-selection_container');
+		// if (heightmapContainer) {
+		// 	// Remove 'selected' class from all articles
+		// 	const articles = heightmapContainer.querySelectorAll('article');
+		// 	articles.forEach(article => article.classList.remove('selected'));
+
+
+		// 	// Add 'selected' class to the chosen template
+		// 	const selectedTemplate = heightmapContainer.querySelector(`article[data-id="${mapOptions.heightmap}"]`);
+		// 	// Trigger click event on the selected template
+		// 	if (selectedTemplate) {
+		// 		selectedTemplate.click();
+
+		// 		// Also dispatch a custom event to ensure the application registers the selection
+		// 		selectedTemplate.dispatchEvent(new Event('click', { bubbles: true }));
+
+		// 		// Update template input field if it exists
+		// 		const templateInput = document.getElementById('templateInput');
+		// 		if (templateInput) {
+		// 			templateInput.value = mapOptions.heightmap;
+		// 			templateInput.dispatchEvent(new Event('change', { bubbles: true }));
+		// 		}
+		// 	}
+
+		// 	if (selectedTemplate) {
+		// 		selectedTemplate.classList.add('selected');
+		// 		// Generate the map with our settings
+		// 		if (typeof regenerateMap === "function") {
+		// 			// Find and click the "New Map" button using more specific selector
+		// 			let newMapButton = document.querySelector('.ui-dialog-buttonpane .ui-dialog-buttonset button:nth-child(3)');
+
+		// 			// Fallback to find by text content if specific selector fails
+		// 			if (!newMapButton || newMapButton.textContent.trim() !== "New Map") {
+		// 				newMapButton = Array.from(document.querySelectorAll('.ui-button'))
+		// 					.find(button => button.textContent.trim() === "New Map");
+		// 			}
+
+		// 			if (newMapButton) {
+		// 				newMapButton.click();
+		// 				console.log("New Map button clicked");
+		// 			} else {
+		// 				console.log("New Map button not found, using regenerateMap() instead");
+		// 				// regenerateMap();
+		// 			}
+		// 		}
+		// 	}
 		// }
-
-		// regenerateMap("re-options");
 	}, mapOptions);
 
 	// Call generate function with our options
-	console.log('Starting map generation with seed:', mapOptions.seed);
+	console.log("Starting map generation with seed:", mapOptions.seed);
 	// const genResult = await page.evaluate((seed) => {
 	// 	// Pass seed directly to generate function
 	// 	return regenerateMap("re-options");
 	// }, mapOptions.seed);
 
-	console.log('Map generation complete');
+	console.log("Map generation complete");
 
 	// Extract map statistics
 	const stats = await page.evaluate(() => {
@@ -201,7 +304,7 @@ parseCommandLineArgs();
 			burgs: pack.burgs.length - 1,
 			religions: pack.religions.length - 1,
 			culturesSet: culturesSet.value,
-			cultures: pack.cultures.length - 1
+			cultures: pack.cultures.length - 1,
 		};
 	});
 
@@ -225,26 +328,26 @@ parseCommandLineArgs();
 	console.log("=====================\n");
 
 	// Call exportToJson to trigger download and wait for it
-	console.log('Starting JSON export...');
-	const exportResult = await page.evaluate(() => exportToJson('Full'));
-	console.log('exportToJson returned:', exportResult);
+	console.log("Starting JSON export...");
+	const exportResult = await page.evaluate(() => exportToJson("Full"));
+	console.log("exportToJson returned:", exportResult);
 
 	// Wait for the download to complete
 	const downloadedFile = await waitForDownload();
 
 	// Close Puppeteer and server
-	await browser.close();
-	server.close(() => {
-		console.log('Server closed.');
-	});
+	// await browser.close();
+	// server.close(() => {
+	// 	console.log('Server closed.');
+	// });
 
 	if (downloadedFile) {
 		console.log(`JSON file successfully downloaded to: ${downloadedFile}`);
 	} else {
 		console.error(`Failed to download JSON file to: ${downloadPath}`);
 	}
-})().catch(err => {
-	console.error('Error occurred:', err);
+})().catch((err) => {
+	console.error("Error occurred:", err);
 	process.exit(1);
 });
 
@@ -252,15 +355,20 @@ parseCommandLineArgs();
 const waitForDownload = (timeout = 30000) => {
 	return new Promise((resolve) => {
 		const startTime = Date.now();
-		const initialFiles = fs.readdirSync(path.resolve(__dirname, 'downloads'));
+		const initialFiles = fs.readdirSync(path.resolve(__dirname, "downloads"));
 
 		const checkDownload = () => {
-			const currentFiles = fs.readdirSync(path.resolve(__dirname, 'downloads'));
-			const newFiles = currentFiles.filter(file => !initialFiles.includes(file));
+			const currentFiles = fs.readdirSync(path.resolve(__dirname, "downloads"));
+			const newFiles = currentFiles.filter(
+				(file) => !initialFiles.includes(file)
+			);
 
 			if (newFiles.length > 0) {
 				// Check if file is still being written (file size changes)
-				const filePath = path.join(path.resolve(__dirname, 'downloads'), newFiles[0]);
+				const filePath = path.join(
+					path.resolve(__dirname, "downloads"),
+					newFiles[0]
+				);
 				const fileSizeBefore = fs.statSync(filePath).size;
 
 				setTimeout(() => {
@@ -275,7 +383,7 @@ const waitForDownload = (timeout = 30000) => {
 			} else if (Date.now() - startTime < timeout) {
 				setTimeout(checkDownload, 100);
 			} else {
-				console.log('Download timed out');
+				console.log("Download timed out");
 				resolve(null);
 			}
 		};
