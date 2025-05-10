@@ -7,7 +7,7 @@ const fs = require('fs');
 // Map generation options with defaults
 const mapOptions = {
 	seed: "AgentMatrix2025",       // Custom seed
-	heightmap: "highIsland",       // Heightmap template
+	heightmap: "volcano",       // Heightmap template
 	mapSize: 65,                   // Map size percentage
 	culturesSet: "european",       // Culture set
 	points: 12000,                 // Number of points/cells
@@ -102,9 +102,10 @@ parseCommandLineArgs();
 	});
 
 	// Launch Puppeteer
-	const browser = await puppeteer.launch({ 
+	const browser = await puppeteer.launch({
 		headless: true,
-		args: ['--no-sandbox']
+		args: ['--no-sandbox'],
+		devtools: true  // This will open DevTools
 	});
 	const page = await browser.newPage();
 
@@ -121,11 +122,22 @@ parseCommandLineArgs();
 
 	// Set form values and inject options before map generation
 	await page.evaluate((mapOptions) => {
+		showOptions();
 		// Set seed
 		document.getElementById("optionsSeed").value = mapOptions.seed;
 
 		// Set heightmap template
-		document.getElementById("templateInput").value = mapOptions.heightmap;
+		// Get the slider-input element  
+		const statesNumberInput = document.getElementById("statesNumber");
+
+		// Set its value  
+		statesNumberInput.value = 20;
+
+		// Make sure to trigger any necessary events  
+		statesNumberInput.dispatchEvent(new Event('change'));
+		regenerateMap("heightmap change");				
+		// Log the value of templateInput
+		// console.log('templateInput.value after set:', document.getElementById("templateInput").value);
 
 		// Set map size
 		document.getElementById("mapSizeInput").value = mapOptions.mapSize;
@@ -149,21 +161,22 @@ parseCommandLineArgs();
 		document.getElementById("longitudeOutput").value = mapOptions.longitudeValue;
 
 		// Lock options to prevent randomization
-		if (window.lockOption) {
-			window.lockOption("template");
-			window.lockOption("mapSize");
-			window.lockOption("latitude");
-			window.lockOption("longitude");
-		}
+		// if (window.lockOption) {
+		// 	window.lockOption("template");
+		// 	window.lockOption("mapSize");
+		// 	window.lockOption("latitude");
+		// 	window.lockOption("longitude");
+		// }
 
+		// regenerateMap("re-options");
 	}, mapOptions);
 
 	// Call generate function with our options
 	console.log('Starting map generation with seed:', mapOptions.seed);
-	const genResult = await page.evaluate((seed) => {
-		// Pass seed directly to generate function
-		return generate({ seed: seed });
-	}, mapOptions.seed);
+	// const genResult = await page.evaluate((seed) => {
+	// 	// Pass seed directly to generate function
+	// 	return regenerateMap("re-options");
+	// }, mapOptions.seed);
 
 	console.log('Map generation complete');
 
@@ -191,6 +204,8 @@ parseCommandLineArgs();
 			cultures: pack.cultures.length - 1
 		};
 	});
+
+	// page.on('console', msg => console.log('Browser console:', msg.text()));
 
 	// Format the statistics as in the showStatistics() function
 	console.log("\n=== MAP STATISTICS ===");
@@ -267,4 +282,3 @@ const waitForDownload = (timeout = 30000) => {
 		checkDownload();
 	});
 };
-
